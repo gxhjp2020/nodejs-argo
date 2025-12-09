@@ -108,27 +108,49 @@ function cleanupOldFiles() {
   }
 }
 
-// ==== 访问计数器 BEGIN ====
-let visitCount = 0;
-// ==== 访问计数器 END ====
+// =======================
+// 内存计数（重启清空）
+// =======================
+let totalVisits = 0;     // 总访问次数
+let ipCounts = {};       // IP => 访问次数（重启清空）
 
-// 根路由（主页）
-app.get("/", function(req, res) {
-  visitCount++;
+app.get("/", async (req, res) => {
 
+  // 获取访问 IP（支持反代）
+  const ip =
+    req.headers["x-forwarded-for"]?.split(",")[0] ||
+    req.connection.remoteAddress ||
+    "unknown";
+
+  // --- 总访问次数 +1 ---
+  totalVisits++;
+
+  // --- 每个 IP +1 ---
+  if (!ipCounts[ip]) ipCounts[ip] = 0;
+  ipCounts[ip]++;
+
+  // --- 构造 IP 列表 HTML ---
+  let listHtml = "";
+  for (const addr in ipCounts) {
+    listHtml += `<li>${addr} —— ${ipCounts[addr]} 次</li>`;
+  }
+
+  // --- 输出页面 ---
   res.send(`
     <html>
-      <head>
-        <meta charset="utf-8" />
-        <title>Home</title>
-      </head>
-      <body style="font-family: Arial; margin: 40px;">
+      <head><meta charset="utf-8"><title>访问统计</title></head>
+      <body style="font-family: Arial; padding: 20px;">
         <h2>Hello world!</h2>
-        <p>页面访问次数：<b>${visitCount}</b></p>
+
+        <p>页面总访问次数：<b>${totalVisits}</b></p>
+
+        <h3>来访 IP 统计（重启清空）：</h3>
+        <ul>${listHtml}</ul>
       </body>
     </html>
   `);
 });
+
 
 
 // 生成xr-ay配置文件
