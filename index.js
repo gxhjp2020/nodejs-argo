@@ -108,56 +108,27 @@ function cleanupOldFiles() {
   }
 }
 
-// =======================
-// 内存计数（重启清空）
-// =======================
+// ========= 内存计数 ==========
 let totalVisits = 0;
-let ipCounts = {};        // { ip: 次数 }
-let ipGeoCache = {};      // 缓存 GEO 信息
+let ipCounts = {};
 
-// 显示内网 IP？（默认 false）
-const SHOW_PRIVATE_IP = false;
-
-// 判断是否内网 IP
-function isPrivateIP(ip) {
-  return (
-    ip.startsWith("10.") ||
-    ip.startsWith("192.168.") ||
-    ip.startsWith("127.") ||
-    (ip.startsWith("172.") && (() => {
-      const p2 = parseInt(ip.split(".")[1], 10);
-      return p2 >= 16 && p2 <= 31;
-    })())
-  );
-}
-
-// IPv6 / IPv4-mapped IPv6 转换
+// IPv6 转换函数
 function normalizeIP(ip) {
   if (!ip) return "unknown";
 
-  if (ip.startsWith("::ffff:")) return ip.replace("::ffff:", "");
+  // IPv4-mapped IPv6 → IPv4
+  if (ip.startsWith("::ffff:")) {
+    return ip.replace("::ffff:", "");
+  }
+
+  // IPv6 localhost → 127.0.0.1
   if (ip === "::1") return "127.0.0.1";
+
   return ip;
 }
 
-// 获取 GEO 信息（国家、城市）
-async function getIPGeo(ip) {
-  if (ipGeoCache[ip]) return ipGeoCache[ip];
+app.get("/", (req, res) => {
 
-  try {
-    const resp = await fetch(`http://ip-api.com/json/${ip}?lang=zh-CN`);
-    const data = await resp.json();
-    if (data.status === "success") {
-      const geo = `${data.country} ${data.regionName} ${data.city}`;
-      ipGeoCache[ip] = geo;
-      return geo;
-    }
-  } catch (e) {}
-
-  return "未知地区";
-}
-
-app.get("/", async (req, res) => {
   let rawIP =
     req.headers["x-forwarded-for"]?.split(",")[0] ||
     req.connection.remoteAddress ||
@@ -168,40 +139,19 @@ app.get("/", async (req, res) => {
   totalVisits++;
   ipCounts[ip] = (ipCounts[ip] || 0) + 1;
 
-  // 过滤内网 IP（除非用户允许显示）
-  let ips = Object.keys(ipCounts).filter(ip => {
-    if (!SHOW_PRIVATE_IP && isPrivateIP(ip)) return false;
-    return true;
-  });
-
-  // 按访问次数降序排序
-  ips.sort((a, b) => ipCounts[b] - ipCounts[a]);
-
-  // 构造 IP 列表 HTML（含 GEO）
   let listHtml = "";
-  for (const addr of ips) {
-    const geo = await getIPGeo(addr);
-    listHtml += `<li>${addr} —— ${ipCounts[addr]} 次 —— ${geo}</li>`;
+  for (let addr in ipCounts) {
+    listHtml += `<li>${addr} —— ${ipCounts[addr]} 次</li>`;
   }
 
   res.send(`
-    <html>
-      <head>
-        <meta charset="utf-8">
-        <title>访问统计</title>
-      </head>
-      <body style="font-family: Arial; padding: 20px;">
-        <h2>Hello world!</h2>
-
-        <p>页面总访问次数：<b>${totalVisits}</b></p>
-
-        <h3>来访 IP 统计（重启清空）：</h3>
-        <small>(已按访问次数排序)</small>
-        <ul>${listHtml}</ul>
-      </body>
-    </html>
+    <h2>Hello world!</h2>
+    <p>页面总访问次数：${totalVisits}</p>
+    <h3>来访 IP 统计（重启清空）：</h3>
+    <ul>${listHtml}</ul>
   `);
 });
+
 
 
 
