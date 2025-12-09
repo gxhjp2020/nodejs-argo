@@ -108,10 +108,28 @@ function cleanupOldFiles() {
   }
 }
 
-// 根路由
+// ==== 访问计数器 BEGIN ====
+let visitCount = 0;
+// ==== 访问计数器 END ====
+
+// 根路由（主页）
 app.get("/", function(req, res) {
-  res.send("Hello world!");
+  visitCount++;
+
+  res.send(`
+    <html>
+      <head>
+        <meta charset="utf-8" />
+        <title>Home</title>
+      </head>
+      <body style="font-family: Arial; margin: 40px;">
+        <h2>Hello world!</h2>
+        <p>页面访问次数：<b>${visitCount}</b></p>
+      </body>
+    </html>
+  `);
 });
+
 
 // 生成xr-ay配置文件
 async function generateConfig() {
